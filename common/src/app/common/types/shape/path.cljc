@@ -17,4 +17,3 @@
 
 (s/def ::content
   (s/coll-of ::command-item :kind vector?))
-

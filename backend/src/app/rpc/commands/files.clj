@@ -12,6 +12,8 @@
    [app.common.geom.shapes :as gsh]
    [app.common.pages.helpers :as cph]
    [app.common.pages.migrations :as pmg]
+   [app.common.schema :as sm]
+   [app.common.schema.desc-js-like :as-alias smdj]
    [app.common.spec :as us]
    [app.common.types.components-list :as ctkl]
    [app.common.types.file :as ctf]
@@ -269,6 +271,44 @@
 
 ;; --- COMMAND QUERY: get-file (by id)
 
+(sm/def! ::features
+  [:schema
+   {:title "FileFeatures"
+    ::smdj/inline true
+    ;; FIXME: revisit this
+    :gen/gen (sm/gen-set-from-choices ["storage/pointer-map"
+                                       "storage/objects-map"
+                                       "components/v2"])}
+   ::sm/set-of-strings])
+
+(sm/def! ::file
+  [:map {:title "File"}
+   [:id ::sm/uuid]
+   [:features ::features]
+   [:has-media-trimmed :boolean]
+   [:comment-thread-seqn {:min 0} :int]
+   [:name :string]
+   [:revn {:min 0} :int]
+   [:modified-at ::dt/instant]
+   [:is-shared :boolean]
+   [:project-id ::sm/uuid]
+   [:created-at ::dt/instant]
+   [:data {:optional true} :any]])
+
+(sm/def! ::permissions-mixin
+  [:map {:title "PermissionsMixin"}
+   [:permissions ::perms/permissions]])
+
+(sm/def! ::file-with-permissions
+  [:merge {:title "FileWithPermissions"}
+   ::file
+   ::permissions-mixin])
+
+(sm/def! ::get-file
+  [:map {:title "get-file"}
+   [:features {:optional true} ::features]
+   [:id ::sm/uuid]])
+
 (defn get-file
   [conn id client-features]
   ;; here we check if client requested features are supported
@@ -287,17 +327,14 @@
   [{:keys [modified-at revn]}]
   (str (dt/format-instant modified-at :iso) "-" revn))
 
-(s/def ::get-file
-  (s/keys :req [::rpc/profile-id]
-          :req-un [::id]
-          :opt-un [::features]))
-
 (sv/defmethod ::get-file
   "Retrieve a file by its ID. Only authenticated users."
   {::doc/added "1.17"
    ::cond/get-object #(get-minimal-file %1 (:id %2))
-   ::cond/key-fn get-file-etag}
-  [{:keys [::db/pool] :as cfg} {:keys [::rpc/profile-id id features]}]
+   ::cond/key-fn get-file-etag
+   ::sm/params ::get-file
+   ::sm/result ::file-with-permissions}
+  [{:keys [::db/pool] :as cfg} {:keys [::rpc/profile-id id features] :as params}]
   (dm/with-open [conn (db/open pool)]
     (let [perms (get-permissions conn profile-id id)]
       (check-read-permissions! perms)
@@ -308,23 +345,29 @@
 
 ;; --- COMMAND QUERY: get-file-fragment (by id)
 
+(sm/def! ::file-fragment
+  [:map {:title "FileFragment"}
+   [:id ::sm/uuid]
+   [:file-id ::sm/uuid]
+   [:created-at ::dt/instant]
+   [:content any?]])
+
+(sm/def! ::get-file-fragment
+  [:map {:title "get-file-fragment"}
+   [:file-id ::sm/uuid]
+   [:fragment-id ::sm/uuid]
+   [:share-id {:optional true} ::sm/uuid]])
+
 (defn- get-file-fragment
   [conn file-id fragment-id]
   (some-> (db/get conn :file-data-fragment {:file-id file-id :id fragment-id})
           (update :content blob/decode)))
 
-(s/def ::share-id ::us/uuid)
-(s/def ::fragment-id ::us/uuid)
-
-(s/def ::get-file-fragment
-  (s/keys :req-un [::file-id ::fragment-id]
-          :opt [::rpc/profile-id]
-          :opt-un [::share-id]))
-
 (sv/defmethod ::get-file-fragment
   "Retrieve a file by its ID. Only authenticated users."
   {::doc/added "1.17"
-   ::rpc/:auth false}
+   ::sm/params ::get-file-fragment
+   ::sm/result ::file-fragment}
   [{:keys [::db/pool] :as cfg} {:keys [::rpc/profile-id file-id fragment-id share-id] }]
   (dm/with-open [conn (db/open pool)]
     (let [perms (get-permissions conn profile-id file-id share-id)]
@@ -352,20 +395,20 @@
      (->> (db/exec! conn [sql file-id ids])
           (d/index-by :object-id :data)))))
 
-(s/def ::get-file-object-thumbnails
-  (s/keys :req [::rpc/profile-id] :req-un [::file-id]))
-
 (sv/defmethod ::get-file-object-thumbnails
   "Retrieve a file object thumbnails."
   {::doc/added "1.17"
+   ::sm/params [:map {:title "get-file-object-thumbnails"}
+                [:file-id ::sm/uuid]]
+   ::sm/result [:map-of :string :string]
    ::cond/get-object #(get-minimal-file %1 (:file-id %2))
    ::cond/reuse-key? true
-   ::cond/key-fn get-file-etag}
+   ::cond/key-fn get-file-etag
+   }
   [{:keys [::db/pool] :as cfg} {:keys [::rpc/profile-id file-id] :as params}]
   (dm/with-open [conn (db/open pool)]
     (check-read-permissions! conn profile-id file-id)
     (get-object-thumbnails conn file-id)))
-
 
 ;; --- COMMAND QUERY: get-project-files
 
@@ -382,16 +425,16 @@
       and f.deleted_at is null
     order by f.modified_at desc")
 
-(s/def ::get-project-files
-  (s/keys :req [::rpc/profile-id] :req-un [::project-id]))
-
 (defn get-project-files
   [conn project-id]
   (db/exec! conn [sql:project-files project-id]))
 
 (sv/defmethod ::get-project-files
   "Get all files for the specified project."
-  {::doc/added "1.17"}
+  {::doc/added "1.17"
+   ::sm/params [:map {:title "get-project-files"}
+                [:project-id ::sm/uuid]]
+   ::sm/result [:vector ::file]}
   [{:keys [::db/pool] :as cfg} {:keys [::rpc/profile-id project-id]}]
   (dm/with-open [conn (db/open pool)]
     (projects/check-read-permissions! conn profile-id project-id)
@@ -402,15 +445,12 @@
 
 (declare get-has-file-libraries)
 
-(s/def ::file-id ::us/uuid)
-
-(s/def ::has-file-libraries
-  (s/keys :req [::rpc/profile-id]
-          :req-un [::file-id]))
-
 (sv/defmethod ::has-file-libraries
   "Checks if the file has libraries. Returns a boolean"
-  {::doc/added "1.15.1"}
+  {::doc/added "1.15.1"
+   ::sm/params [:map {:title "has-file-libraries"}
+                [:file-id ::sm/uuid]]
+   ::sm/result :boolean}
   [{:keys [::db/pool] :as cfg} {:keys [::rpc/profile-id file-id]}]
   (dm/with-open [conn (db/open pool)]
     (check-read-permissions! pool profile-id file-id)
@@ -438,7 +478,7 @@
   structure."
   [{:keys [objects] :as page} object-id]
   (let [objects (cph/get-children-with-self objects object-id)]
-     (assoc page :objects (d/index-by :id objects))))
+    (assoc page :objects (d/index-by :id objects))))
 
 (defn- prune-thumbnails
   "Given the page data, removes the `:thumbnail` prop from all
@@ -448,6 +488,12 @@
 
 (defn get-page
   [conn {:keys [file-id page-id object-id features]}]
+  (when (and (uuid? object-id)
+             (not (uuid? page-id)))
+    (ex/raise :type :validation
+              :code :params-validation
+              :hint "page-id is required when object-id is provided"))
+
   (let [file     (get-file conn file-id features)
         page-id  (or page-id (-> file :data :pages first))
         page     (dm/get-in file [:data :pages-index page-id])]
@@ -455,17 +501,11 @@
       (uuid? object-id)
       (prune-objects object-id))))
 
-(s/def ::page-id ::us/uuid)
-(s/def ::object-id ::us/uuid)
-(s/def ::get-page
-  (s/and
-   (s/keys :req [::rpc/profile-id]
-           :req-un [::file-id]
-           :opt-un [::page-id ::object-id ::features])
-   (fn [obj]
-     (if (contains? obj :object-id)
-       (contains? obj :page-id)
-       true))))
+(sm/def! ::get-page
+  [:map {:title "GetPage"}
+   [:page-id {:optional true} ::sm/uuid]
+   [:object-id {:optional true} ::sm/uuid]
+   [:features {:optional true} ::features]])
 
 (sv/defmethod ::get-page
   "Retrieves the page data from file and returns it. If no page-id is
@@ -477,7 +517,8 @@
   mandatory.
 
   Mainly used for rendering purposes."
-  {::doc/added "1.17"}
+  {::doc/added "1.17"
+   ::sm/params ::get-page}
   [{:keys [::db/pool] :as cfg} {:keys [::rpc/profile-id file-id] :as params}]
   (dm/with-open [conn (db/open pool)]
     (check-read-permissions! conn profile-id file-id)
@@ -796,15 +837,18 @@
           :always
           (update :objects assoc-thumbnails page-id thumbs))))))
 
-(s/def ::get-file-data-for-thumbnail
-  (s/keys :req [::rpc/profile-id]
-          :req-un [::file-id]
-          :opt-un [::features]))
 
 (sv/defmethod ::get-file-data-for-thumbnail
   "Retrieves the data for generate the thumbnail of the file. Used
   mainly for render thumbnails on dashboard."
-  {::doc/added "1.17"}
+  {::doc/added "1.17"
+   ::sm/params [:map {:title "get-file-data-for-thumbnail"}
+                [:file-id ::sm/uuid]
+                [:fetures {:optional true} ::features]]
+   ::sm/result [:map {:title "PartialFile"}
+                [:id ::sm/uuid]
+                [:revn {:min 0} :int]
+                [:page :any]]}
   [{:keys [::db/pool] :as cfg} {:keys [::rpc/profile-id file-id features] :as props}]
   (dm/with-open [conn (db/open pool)]
     (check-read-permissions! conn profile-id file-id)
@@ -830,13 +874,30 @@
                :modified-at (dt/now)}
               {:id id}))
 
-(s/def ::rename-file
-  (s/keys :req [::rpc/profile-id]
-          :req-un [::name ::id]))
-
 (sv/defmethod ::rename-file
   {::doc/added "1.17"
-   ::webhooks/event? true}
+   ::webhooks/event? true
+
+   ::sm/webhook
+   [:map {:title "RenameFileEvent"}
+    [:id ::sm/uuid]
+    [:project-id ::sm/uuid]
+    [:name :string]
+    [:created-at ::dt/instant]
+    [:modified-at ::dt/instant]]
+
+   ::sm/params
+   [:map {:title "RenameFileParams"}
+    [:name {:min 1} :string]
+    [:id ::sm/uuid]]
+
+   ::sm/result
+   [:map {:title "SimplifiedFile"}
+    [:id ::sm/uuid]
+    [:name :string]
+    [:created-at ::dt/instant]
+    [:modified-at ::dt/instant]]}
+
   [{:keys [::db/pool] :as cfg} {:keys [::rpc/profile-id id] :as params}]
   (db/with-atomic [conn pool]
     (check-edition-permissions! conn profile-id id)
