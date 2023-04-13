@@ -25,6 +25,7 @@
    [app.util.dom :as dom]
    [app.util.i18n :as i18n]
    [app.util.theme :as theme]
+   [app.wasm :as wasm]
    [beicon.core :as rx]
    [debug]
    [features]
@@ -75,6 +76,7 @@
 
 (defn ^:export init
   []
+  (wasm/init!)
   (worker/init!)
   (i18n/init! cf/translations)
   (theme/init! cf/themes)
