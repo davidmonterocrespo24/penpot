@@ -8,6 +8,7 @@
   (:require
    [app.common.geom.shapes :as gsh]
    [app.main.ui.hooks :as hooks]
+   [app.main.ui.viewer.inspect.annotation :refer [annotation]]
    [app.main.ui.viewer.inspect.attributes.blur :refer [blur-panel]]
    [app.main.ui.viewer.inspect.attributes.fill :refer [fill-panel]]
    [app.main.ui.viewer.inspect.attributes.image :refer [image-panel]]
@@ -37,7 +38,9 @@
         shapes  (mf/with-memo [shapes]
                   (mapv #(gsh/translate-to-frame % frame) shapes))
         type    (if (= (count shapes) 1) (-> shapes first :type) :multiple)
-        options (type->options type)]
+        options (type->options type)
+        show-annotation? (and (= (count shapes) 1)
+                              (:annotation (first shapes)))]
     [:div.element-options
      (for [[idx option] (map-indexed vector options)]
        [:> (case option
@@ -55,6 +58,8 @@
          :shapes shapes
          :frame frame
          :from from}])
+     (when show-annotation?
+       [:& annotation {:shape (first shapes)}])
      [:& exports
       {:shapes shapes
        :type type

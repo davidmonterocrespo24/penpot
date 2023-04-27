@@ -1265,7 +1265,6 @@
 
             not-group-like? (and (= (count selected) 1)
                                  (not (contains? #{:group :bool} (:type head))))
-           
             no-bool-shapes? (->> all-selected (some (comp #{:frame :text} :type)))]
 
         (rx/concat
@@ -2057,6 +2056,38 @@
     ptk/UpdateEvent
     (update [_ state]
       (assoc-in state [:workspace-global :file-library-reverse-sort] reverse-sort?))))
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Components annotations
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(defn update-component-annotation
+  [id annotation]
+  (ptk/reify ::update-component-annotation
+    ptk/WatchEvent
+    (watch [_ _ _]
+      (rx/of (if (nil? annotation)
+               (dch/update-shapes [id] #(dissoc % :annotation))
+               (dch/update-shapes [id] #(assoc % :annotation annotation)))))))
+
+(defn set-annotations-expanded
+  [expanded?]
+  (ptk/reify ::set-annotations-expanded
+    ptk/UpdateEvent
+    (update [_ state]
+      (assoc-in state [:workspace-annotations :expanded?] expanded?))))
+
+(defn set-annotations-create-id
+  [id]
+  (ptk/reify ::set-annotations-create-id
+    ptk/UpdateEvent
+    (update [_ state]
+      (if id
+        (-> (assoc-in state [:workspace-annotations :create-id] id)
+            (assoc-in [:workspace-annotations :expanded?] true))
+        (d/dissoc-in state [:workspace-annotations :create-id])))))
+
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Exports
