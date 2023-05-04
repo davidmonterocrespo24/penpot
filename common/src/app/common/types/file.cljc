@@ -281,6 +281,22 @@
 
     (some used-in-container? (containers-seq file-data))))
 
+(defn used-assets-changed-since
+  "Get a lazy sequence of all assets in the library that are in use by the file and have
+   been modified after the given date."
+  [file-data library since-date]
+  (letfn [(used-assets-shape [shape]
+             (concat 
+              (ctkl/used-components-changed-since shape library since-date)
+              (ctcl/used-colors-changed-since shape library since-date)
+              (ctyl/used-typographies-changed-since shape library since-date)))
+
+          (used-assets-container [container]
+           (->> (mapcat used-assets-shape (ctn/shapes-seq container))
+                (map #(cons (:id container) %))))]
+    
+    (mapcat used-assets-container (containers-seq file-data))))
+
 (defn get-or-add-library-page
   "If exists a page named 'Library backup', get the id and calculate the position to start
   adding new components. If not, create it and start at (0, 0)."

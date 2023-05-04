@@ -605,14 +605,15 @@
              container   (cph/get-container local-file :page page-id)
              shape       (ctn/get-shape container id)]
 
-         (when (ctk/in-component-instance? shape)
+         (when (ctk/instance-root? shape)
            (let [libraries (wsh/get-libraries state)
 
                  changes
                  (-> (pcb/empty-changes it)
                      (pcb/set-undo-group undo-group)
                      (pcb/with-container container)
-                     (dwlh/generate-sync-shape-inverse libraries container id))
+                     (cond-> (ctk/instance-root? shape)
+                       (dwlh/generate-sync-shape-inverse libraries container id)))
 
                  file-id   (:component-file shape)
                  file      (wsh/get-file state file-id)
@@ -631,7 +632,15 @@
 
                  nonlocal-changes (-> changes
                                       (update :redo-changes #(into [] xf-remove %))
-                                      (update :undo-changes #(into [] xf-remove %)))]
+                                      (update :undo-changes #(into [] xf-remove %)))
+
+                 local-changes (cond-> local-changes
+                                 (= (:id local-file) file-id)
+                                 (pcb/set-component-modified (:component-id shape)))
+
+                 nonlocal-changes (cond-> nonlocal-changes
+                                    (not= (:id local-file) file-id)
+                                    (pcb/set-component-modified (:component-id shape)))]
 
              (log/debug :msg "UPDATE-COMPONENT finished"
                         :js/local-changes (log-changes
@@ -801,6 +810,8 @@
           (rx/of (dch/commit-changes (assoc changes :file-id file-id))))))))
 
 (def ignore-sync
+  "Mark the file as ignore syncs. All library changes before this moment will not
+   ber notified to sync."
   (ptk/reify ::ignore-sync
     ptk/UpdateEvent
     (update [_ state]
@@ -812,13 +823,27 @@
                {:file-id (get-in state [:workspace-file :id])
                 :date (dt/now)}))))
 
+(defn spy [msg x] (js/console.log msg (clj->js x)) x)
+(defn assets-need-sync
+  "Get a lazy sequence of all the assets of each type in the library that have
+  been modified after the last sync of the library. The sync date may be
+  overriden by providing a ingnore-until parameter.
+   
+  The sequence items are tuples of (page-id shape-id asset-id asset-type)."
+  ([library file-data] (assets-need-sync library file-data nil))
+  ([library file-data ignore-until]
+    (let [sync-date (max (:synced-at library) (or ignore-until 0))]
+      (when (> (:modified-at library) sync-date)
+        (spy "result" (ctf/used-assets-changed-since file-data library sync-date))))))
+
 (defn notify-sync-file
   [file-id]
   (us/assert ::us/uuid file-id)
   (ptk/reify ::notify-sync-file
     ptk/WatchEvent
     (watch [_ state _]
-      (let [libraries-need-sync (filter #(> (:modified-at %) (:synced-at %))
+      (let [file-data (:workspace-data state)
+            libraries-need-sync (filter #(seq (assets-need-sync % file-data))
                                         (vals (get state :workspace-libraries)))
             do-update #(do (apply st/emit! (map (fn [library]
                                                   (sync-file (:current-file-id state)
@@ -828,14 +853,15 @@
             do-dismiss #(do (st/emit! ignore-sync)
                             (st/emit! dm/hide))]
 
-        (rx/of (dm/info-dialog
-                (tr "workspace.updates.there-are-updates")
-                :inline-actions
-                [{:label (tr "workspace.updates.update")
-                  :callback do-update}
-                 {:label (tr "workspace.updates.dismiss")
-                  :callback do-dismiss}]
-                :sync-dialog))))))
+        (when (seq libraries-need-sync)
+          (rx/of (dm/info-dialog
+                  (tr "workspace.updates.there-are-updates")
+                  :inline-actions
+                  [{:label (tr "workspace.updates.update")
+                    :callback do-update}
+                   {:label (tr "workspace.updates.dismiss")
+                    :callback do-dismiss}]
+                  :sync-dialog)))))))
 
 (defn watch-component-changes
   "Watch the state for changes that affect to any main instance. If a change is detected will throw

@@ -20,10 +20,11 @@
 (s/def ::id uuid?)
 (s/def ::name ::us/string)
 (s/def ::path (s/nilable ::us/string))
+(s/def ::modified-at ::us/inst)
 
 (s/def ::container
   (s/keys :req-un [::id ::name]
-          :opt-un [::type ::path ::ctst/objects]))
+          :opt-un [::type ::path ::modified-at ::ctst/objects]))
 
 (defn make-container
   [page-or-component type]

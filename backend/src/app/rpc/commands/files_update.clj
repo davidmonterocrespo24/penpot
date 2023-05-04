@@ -68,7 +68,7 @@
 (def ^:private library-change-types
   #{:add-color :mod-color :del-color
     :add-media :mod-media :del-media
-    :add-component :mod-component :del-component
+    :add-component :mod-component :del-component :set-component-modified
     :add-typography :mod-typography :del-typography})
 
 (def ^:private file-change-types
@@ -78,8 +78,7 @@
 (defn- library-change?
   [{:keys [type] :as change}]
   (or (contains? library-change-types type)
-      (and (contains? file-change-types type)
-           (some? (:component-id change)))))
+      (contains? file-change-types type)))
 
 (def ^:private sql:get-file
   "SELECT f.*, p.team_id

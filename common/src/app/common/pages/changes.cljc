@@ -223,8 +223,6 @@
                 (not= :frame (:type obj))
                 (as-> $$ (reduce (partial assign-frame-id frame-id) $$ (:shapes obj))))))
 
-
-
           (move-objects [objects]
             (let [valid?   (every? (partial is-valid-move? objects) shapes)
                   parent   (get objects parent-id)
@@ -284,7 +282,7 @@
 
 (defmethod process-change :mod-color
   [data {:keys [color]}]
-  (d/assoc-in-when data [:colors (:id color)] color))
+  (ctcl/set-color data color))
 
 (defmethod process-change :del-color
   [data {:keys [id]}]
@@ -335,6 +333,10 @@
   [data {:keys [id]}]
   (ctf/purge-component data id))
 
+(defmethod process-change :set-component-modified
+  [data {:keys [id]}]
+  (ctkl/set-component-modified data id))
+
 ;; -- Typography
 
 (defmethod process-change :add-typography
@@ -343,7 +345,7 @@
 
 (defmethod process-change :mod-typography
   [data {:keys [typography]}]
-  (d/update-in-when data [:typographies (:id typography)] merge typography))
+  (ctyl/update-typography data (:id typography) merge typography))
 
 (defmethod process-change :del-typography
   [data {:keys [id]}]
@@ -387,8 +389,8 @@
            (not root-name?)
            (not (and ignore-geometry is-geometry?)))
       (->
-        (update :touched cph/set-touched-group group)
-        (dissoc :remote-synced?))
+       (update :touched cph/set-touched-group group)
+       (dissoc :remote-synced?))
 
       (nil? val)
       (dissoc attr)

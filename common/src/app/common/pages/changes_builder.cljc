@@ -647,6 +647,14 @@
                                            :objects (:objects prev-component)}))
       changes)))
 
+(defn set-component-modified
+  [changes id]
+  (-> changes
+      (update :redo-changes conj {:type :set-component-modified
+                                  :id id})
+      (update :undo-changes d/preconj {:type :set-component-modified ;; undo does not restore old modified-at,
+                                       :id id})))                    ;; but this is a new change
+
 (defn delete-component
   [changes id]
   (assert-library changes)

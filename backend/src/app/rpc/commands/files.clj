@@ -246,7 +246,6 @@
               :code :feature-mismatch
               :feature "components/v2"
               :hint "file has 'components/v2' feature enabled but frontend didn't specifies it"))
-
   (cond-> file
     (and (contains? client-features "components/v2")
          (not (contains? features "components/v2")))
@@ -255,7 +254,6 @@
     (and (contains? features "storage/pointer-map")
          (not (contains? client-features "storage/pointer-map")))
     (process-pointers deref)))
-
 
 ;; --- COMMAND QUERY: get-file (by id)
 
