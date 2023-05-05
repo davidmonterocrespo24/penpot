@@ -15,6 +15,7 @@
    [app.common.pages.common :as cpc]
    [app.common.pages.helpers :as cph]
    [app.common.spec :as us]
+   [app.common.types.container :as ctn]
    [app.common.types.modifiers :as ctm]
    [app.common.types.shape.layout :as ctl]
    [app.main.constants :refer [zoom-half-pixel-precision]]
@@ -54,7 +55,7 @@
           shape
 
           (nil? root)
-          (cph/get-root-shape objects shape)
+          (ctn/get-component-shape objects shape {:allow-main? true})
 
           :else root)
 
@@ -64,7 +65,7 @@
           transformed-shape
 
           (nil? transformed-root)
-          (as-> (cph/get-root-shape objects transformed-shape) $
+          (as-> (ctn/get-component-shape objects transformed-shape {:allow-main? true}) $
             (gsh/transform-shape (merge $ (get modif-tree (:id $)))))
 
           :else transformed-root)
@@ -78,6 +79,14 @@
         (when transformed-root
           (gpt/point (- (gsh/left-bound transformed-shape) (gsh/left-bound transformed-root))
                      (- (gsh/top-bound transformed-shape) (gsh/top-bound transformed-root))))
+
+        ;; _ (prn "*************")
+        ;; _ (js/console.log "shape" (clj->js shape))
+        ;; _ (js/console.log "transformed-shape" (clj->js transformed-shape))
+        ;; _ (js/console.log "root" (clj->js root))
+        ;; _ (js/console.log "transformed-root" (clj->js transformed-root))
+        ;; _ (js/console.log "shape-delta" (clj->js shape-delta))
+        ;; _ (js/console.log "transformed-shape-delta" (clj->js transformed-shape-delta))
 
         distance (if (and shape-delta transformed-shape-delta)
                    (gpt/distance-vector shape-delta transformed-shape-delta)

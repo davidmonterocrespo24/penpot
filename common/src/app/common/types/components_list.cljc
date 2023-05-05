@@ -92,6 +92,7 @@
 
 (defn set-component-modified
   [file-data component-id]
+  (prn "set-component-modified" component-id)
   (update-component file-data component-id identity))
 
 (defn delete-component

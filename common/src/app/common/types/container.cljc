@@ -71,14 +71,15 @@
 
 (defn get-component-shape
   "Get the parent shape linked to a component for this shape, if any"
-  [objects shape]
-  (if-not (:shape-ref shape)
-    nil
-    (if (:component-id shape)
-      shape
-      (if-let [parent-id (:parent-id shape)]
-        (get-component-shape objects (get objects parent-id))
-        nil))))
+  ([objects shape] (get-component-shape objects shape nil))
+  ([objects shape {:keys [allow-main?] :or {allow-main? false} :as options}]
+   (if-not (or (:shape-ref shape) allow-main?)
+     nil
+     (if (:component-id shape)
+       shape
+       (if-let [parent-id (:parent-id shape)]
+         (get-component-shape objects (get objects parent-id) options)
+         nil)))))
 
 (defn make-component-shape
   "Clone the shape and all children. Generate new ids and detach
