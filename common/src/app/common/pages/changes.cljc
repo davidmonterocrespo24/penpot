@@ -103,7 +103,7 @@
                      ;; the component needs to be marked as modified.
                      (let [component-root (ctn/get-component-shape objects shape {:allow-main? true})]
                        (when (ctk/main-instance? component-root)
-                         (swap! modified-component-ids conj (:id component-root)))))
+                         (swap! modified-component-ids conj (:component-id component-root)))))
 
         update-fn (fn [objects]
                     (if-let [obj (get objects id)]

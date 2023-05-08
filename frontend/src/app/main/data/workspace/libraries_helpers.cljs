@@ -99,7 +99,7 @@
         (if (and (= (count shapes) 1)
                  (or (and (= (:type (first shapes)) :group) (not components-v2))
                      (= (:type (first shapes)) :frame))
-                 (not (ctk/instance-root? (first shapes))))
+                 (not (ctk/instance-head? (first shapes))))
           [(first shapes) (-> (pcb/empty-changes it page-id)
                               (pcb/with-objects objects))]
           (let [root-name (if (= 1 (count shapes))
@@ -111,7 +111,7 @@
                                     page-id
                                     shapes
                                     root-name
-                                    (not (ctk/instance-root? (first shapes))))
+                                    (not (ctk/instance-head? (first shapes))))
               (prepare-create-board changes
                                     (uuid/next)
                                     (:parent-id (first shapes))
@@ -203,7 +203,7 @@
 (defn- generate-detach-recursive
   [changes container shape-id first]
   (let [shape (ctn/get-shape container shape-id)]
-    (if (and (ctk/instance-root? shape) (not first))
+    (if (and (ctk/instance-head? shape) (not first))
       ;; Subinstances are not detached, but converted in top instances
       (pcb/update-shapes changes [(:id shape)] #(assoc % :component-root? true))
       ;; Otherwise, detach the shape and all children

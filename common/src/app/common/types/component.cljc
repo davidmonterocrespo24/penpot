@@ -7,6 +7,12 @@
 (ns app.common.types.component)
 
 (defn instance-root?
+  "Check if this shape is the head of a top instance."
+  [shape]
+  (some? (:component-root? shape)))
+
+(defn instance-head?
+  "Check if this shape is the head of a top instance or a subinstance."
   [shape]
   (some? (:component-id shape)))
 

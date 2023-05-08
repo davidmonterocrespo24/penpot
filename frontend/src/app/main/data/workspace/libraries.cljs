@@ -605,14 +605,14 @@
              container   (cph/get-container local-file :page page-id)
              shape       (ctn/get-shape container id)]
 
-         (when (ctk/instance-root? shape)
+         (when (ctk/instance-head? shape)
            (let [libraries (wsh/get-libraries state)
 
                  changes
                  (-> (pcb/empty-changes it)
                      (pcb/set-undo-group undo-group)
                      (pcb/with-container container)
-                     (cond-> (ctk/instance-root? shape)
+                     (cond-> (ctk/instance-head? shape)
                        (dwlh/generate-sync-shape-inverse libraries container id)))
 
                  file-id   (:component-file shape)

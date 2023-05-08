@@ -80,14 +80,6 @@
           (gpt/point (- (gsh/left-bound transformed-shape) (gsh/left-bound transformed-root))
                      (- (gsh/top-bound transformed-shape) (gsh/top-bound transformed-root))))
 
-        ;; _ (prn "*************")
-        ;; _ (js/console.log "shape" (clj->js shape))
-        ;; _ (js/console.log "transformed-shape" (clj->js transformed-shape))
-        ;; _ (js/console.log "root" (clj->js root))
-        ;; _ (js/console.log "transformed-root" (clj->js transformed-root))
-        ;; _ (js/console.log "shape-delta" (clj->js shape-delta))
-        ;; _ (js/console.log "transformed-shape-delta" (clj->js transformed-shape-delta))
-
         distance (if (and shape-delta transformed-shape-delta)
                    (gpt/distance-vector shape-delta transformed-shape-delta)
                    (gpt/point 0 0))
