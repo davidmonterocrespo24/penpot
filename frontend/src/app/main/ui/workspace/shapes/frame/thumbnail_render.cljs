@@ -105,6 +105,8 @@
         ;; State variable to select whether we show the image thumbnail or the canvas thumbnail
         show-frame-thumbnail (mf/use-state (some? thumbnail-data))
 
+        ;; [value, setState] = useState(whatever)
+
         disable-fills? (or @show-frame-thumbnail (some? @image-url))
 
         on-image-load
