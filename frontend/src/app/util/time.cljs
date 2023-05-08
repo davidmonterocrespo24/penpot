@@ -239,7 +239,6 @@
   ([v {:keys [locale] :or {locale "en"}}]
    (when v
      (let [v (if (datetime? v) (format v :date) v)
-           locale (obj/get locales locale)
-           f (.date (.-formatLong locale) v)]
-       (->> #js {:locale locale}
-            (dateFnsFormat v f))))))
+           f (-> (.-formatLong ^js locale)
+                 (.date v))]
+       (dateFnsFormat v f #js {:locale (obj/get locales locale)})))))
