@@ -530,7 +530,7 @@
   [changes libraries container shape-id reset? components-v2]
   (log/debug :msg "Sync shape direct" :shape (str shape-id) :reset? reset?)
   (let [shape-inst     (ctn/get-shape container shape-id)]
-    (if (ctk/in-component-instance? shape-inst)
+    (if (ctk/in-component-copy? shape-inst)
       (let [library        (dm/get-in libraries [(:component-file shape-inst) :data])
             component      (or (ctkl/get-component library (:component-id shape-inst))
                                (and reset?

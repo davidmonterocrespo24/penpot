@@ -96,12 +96,14 @@
                   (-> data :pages-index (get page-id) :objects)
                   (-> data :components (get component-id) :objects))
 
-        touched-component-ids (atom #{})
+        modified-component-ids (atom #{})
 
         on-touched (fn [shape]
+                     ;; When a shape is modified, if it belongs to a main component instance,
+                     ;; the component needs to be marked as modified.
                      (let [component-root (ctn/get-component-shape objects shape {:allow-main? true})]
                        (when (ctk/main-instance? component-root)
-                         (swap! touched-component-ids conj (:id component-root)))))
+                         (swap! modified-component-ids conj (:id component-root)))))
 
         update-fn (fn [objects]
                     (if-let [obj (get objects id)]
@@ -109,15 +111,15 @@
                         (assoc objects id result))
                       objects))
         
-        touch-components (fn [data]
+        modify-components (fn [data]
                            (reduce ctkl/set-component-modified
-                                   data @touched-component-ids))]
+                                   data @modified-component-ids))]
 
     (as-> data $
       (if page-id
         (d/update-in-when $ [:pages-index page-id :objects] update-fn)
         (d/update-in-when $ [:components component-id :objects] update-fn))
-      (touch-components $))))
+      (modify-components $))))
 
 (defmethod process-change :del-obj
   [data {:keys [page-id component-id id ignore-touched]}]
@@ -353,7 +355,7 @@
   (ctf/purge-component data id))
 
 (defmethod process-change :set-component-modified
-  [data {:keys [id]}]
+  [data {:keys [_id]}]
   data)
   ;; (ctkl/set-component-modified data id))
 
@@ -388,7 +390,7 @@
                         ;;       after the check added in data/workspace/modifiers/check-delta
                         ;;       function. Better check it and test toroughly when activating
                         ;;       components-v2 mode.
-        in-instance?    (ctk/in-component-instance? shape)
+        in-copy?        (ctk/in-component-copy? shape)
         root-name?      (and (= group :name-group)
                              (:component-root? shape))
 
@@ -400,17 +402,10 @@
                  (gsh/close-attrs? attr val shape-val 1)
                  (gsh/close-attrs? attr val shape-val))]
 
-    ;; (js/console.log "*******koko" (:name shape) (str (:id shape)))
-    ;; (js/console.log "attr" (str attr)
-    ;;                 (if ignore "ignore" "")
-    ;;                 (if equal? "equal?" "")
-    ;;                 (if root-name? "root-name?" "")
-    ;;                 (if ignore-geometry "ignore-geometry" "")
-    ;;                 (if is-geometry? "is-geometry?" ""))
     (when (and group (not ignore) (not equal?)
                (not root-name?)
                (not (and ignore-geometry is-geometry?)))
-      ;; Notify touched even if it's not instance, because it may be a main instance
+      ;; Notify touched even if it's not copy, because it may be a main instance
       (on-touched shape))
 
     (cond-> shape
@@ -418,7 +413,7 @@
       ;; set the "touched" flag for the group the attribute belongs to.
       ;; In some cases we need to ignore touched only if the attribute is
       ;; geometric (position, width or transformation).
-      (and in-instance? group (not ignore) (not equal?)
+      (and in-copy? group (not ignore) (not equal?)
            (not root-name?)
            (not (and ignore-geometry is-geometry?)))
       (->
@@ -434,16 +429,16 @@
 (defmethod process-operation :set-touched
   [_ shape op]
   (let [touched (:touched op)
-        in-instance? (ctk/in-component-instance? shape)]
-    (if (or (not in-instance?) (nil? touched) (empty? touched))
+        in-copy? (ctk/in-component-copy? shape)]
+    (if (or (not in-copy?) (nil? touched) (empty? touched))
       (dissoc shape :touched)
       (assoc shape :touched touched))))
 
 (defmethod process-operation :set-remote-synced
   [_ shape op]
   (let [remote-synced? (:remote-synced? op)
-        in-instance? (ctk/in-component-instance? shape)]
-    (if (or (not in-instance?) (not remote-synced?))
+        in-copy? (ctk/in-component-copy? shape)]
+    (if (or (not in-copy?) (not remote-synced?))
       (dissoc shape :remote-synced?)
       (assoc shape :remote-synced? true))))
 
