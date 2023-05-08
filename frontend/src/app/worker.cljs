@@ -13,7 +13,6 @@
    [app.worker.impl :as impl]
    [app.worker.import]
    [app.worker.messages :as wm]
-   [app.worker.object-thumbnails]
    [app.worker.selection]
    [app.worker.snaps]
    [app.worker.thumbnails]

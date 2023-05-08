@@ -39,7 +39,7 @@
                      (rx/take 1))]
     (if (some? node)
       (->> (rx/from (js/createImageBitmap node))
-           (rx/switch-map  #(uw/ask! {:cmd :object-thumbnails/generate} %))
+           (rx/switch-map  #(uw/ask! {:cmd :thumbnails/render-offscreen-canvas} %))
            (rx/map :result))
 
       ;; Not found, we retry after delay
@@ -95,9 +95,6 @@
                (rx/filter (fn [data] (and (some? data) (some? file-id))))
                (rx/mapcat
                 (fn [uri]
-                  (prn "Sending thumbnail" object-id)
-                  (js/console.log uri)
-
                   (rx/merge
                    ;; Update the local copy of the thumbnails so we don't need to request it again
                    ;; FIXME: define it as standalone event
