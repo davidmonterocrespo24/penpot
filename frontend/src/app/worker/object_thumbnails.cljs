@@ -10,10 +10,15 @@
    [promesa.core :as p]))
 
 (defmethod impl/handler :object-thumbnails/generate
-  [{:keys [] :as message} ibpm]
-  (p/let [canvas (js/OffscreenCanvas. (. ibpm -width) (. ibpm -height))
-          ctx    (.getContext canvas "bitmaprenderer")
-          _      (.transferFromImageBitmap ctx ibpm)
-          blob (.convertToBlob canvas #js {:type "image/png"})] 
-    (.close ibpm) ;; free imagebitmap data
-    {:result (.createObjectURL js/URL blob)}))
+  [_ ibpm]
+  (let [canvas (js/OffscreenCanvas. (.-width ^js ibpm) (.-height ^js ibpm))
+        ctx    (.getContext ^js canvas "bitmaprenderer")]
+
+    (.transferFromImageBitmap ^js ctx ibpm)
+
+    (->> (.convertToBlob ^js canvas #js {:type "image/png"})
+         (p/fmap (fn [blob]
+                   (js/console.log "[worker]: generated thumbnail")
+                   {:result (.createObjectURL js/URL blob)}))
+         (p/fnly (fn [_]
+                   (.close ^js ibpm))))))

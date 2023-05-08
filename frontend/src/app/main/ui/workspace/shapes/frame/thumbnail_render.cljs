@@ -42,13 +42,12 @@
   [page-id {:keys [id] :as shape} node-ref rendered? disable? force-render]
 
   (let [frame-image-ref (mf/use-ref nil)
-
-        disable-ref? (mf/use-var disable?)
+        disable-ref?    (mf/use-var disable?)
 
         regenerate-thumbnail (mf/use-var false)
 
         all-children-ref (mf/use-memo (mf/deps id) #(refs/all-children-objects id))
-        all-children (mf/deref all-children-ref)
+        all-children     (mf/deref all-children-ref)
 
         {:keys [x y width height] :as shape-bb}
         (if (:show-content shape)
@@ -64,9 +63,7 @@
 
         image-url    (mf/use-state nil)
         observer-ref (mf/use-var nil)
-
         shape-bb-ref (hooks/use-update-var shape-bb)
-
         updates-str  (mf/use-memo #(rx/subject))
 
         thumbnail-data-ref (mf/use-memo (mf/deps page-id id) #(refs/thumbnail-frame-data page-id id))
@@ -95,6 +92,7 @@
 
              (when @show-frame-thumbnail
                (reset! show-frame-thumbnail false))
+
              ;; If we don't have the thumbnail data saved (normally the first load) we update the data
              ;; when available
 
@@ -105,7 +103,7 @@
            ))
 
         generate-thumbnail
-        (mf/use-callback
+        (mf/use-fn
          (fn generate-thumbnail []
            (try
              ;; When starting generating the canvas we mark it as not ready so its not send to back until
@@ -128,7 +126,7 @@
                                (dom/node->xml node))
 
                        blob (js/Blob. #js [svg-data] #js {:type "image/svg+xml;charset=utf-8"})
-                       url (dm/str (.createObjectURL js/URL blob) "#svg")]
+                       url  (dm/str (.createObjectURL js/URL blob) "#svg")]
                    (reset! image-url url))
 
                  ;; Node not yet ready, we schedule a new generation
@@ -138,7 +136,7 @@
                (.error js/console e)))))
 
         on-change-frame
-        (mf/use-callback
+        (mf/use-fn
          (fn []
            (when (and (some? @node-ref) @rendered? @regenerate-thumbnail)
              (let [loading-images? (some? (dom/query @node-ref "[data-loading='true']"))
@@ -146,11 +144,11 @@
                (when (and (not loading-images?) (not loading-fonts?))
                  (generate-thumbnail)
                  (reset! regenerate-thumbnail false))))))
-        
-        ;; Cuando se actualiza el frame, se marca como no listo para que no se 
+
+        ;; Cuando se actualiza el frame, se marca como no listo para que no se
         ;; envíe al fondo hasta que se regenere.
         on-update-frame
-        (mf/use-callback
+        (mf/use-fn
          (fn []
            (let [image-node (mf/ref-val frame-image-ref)]
              (when (not= "false" (dom/get-data image-node "ready"))
@@ -160,7 +158,7 @@
              (reset! regenerate-thumbnail true))))
 
         on-load-frame-dom
-        (mf/use-callback
+        (mf/use-fn
          (fn [node]
            (when (and (some? node) (nil? @observer-ref))
              (when-not (some? @thumbnail-data-ref)
@@ -266,13 +264,14 @@
                  :stroke-width 2}])
 
        (when (some? @image-url)
-         [:image.thumbnail-canvas {:x x
-                  :y y
-                  :key (dm/str "thumbnail-canvas-" (:id shape))
-                  :data-object-id (dm/str page-id (:id shape))
-                  :width fixed-width
-                  :height fixed-height
-                  :ref frame-image-ref
-                  :href @image-url
-                  :on-load on-image-load}])])]))
-         
+         [:image.thumbnail-canvas
+          {:x x
+           :y y
+           :key (dm/str "thumbnail-canvas-" (:id shape))
+           :data-object-id (dm/str page-id (:id shape))
+           :width fixed-width
+           :height fixed-height
+           :ref frame-image-ref
+           :href @image-url
+           :on-load on-image-load}])])]))
+
