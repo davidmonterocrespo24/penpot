@@ -9,9 +9,10 @@ In the future we may create an unified API for both."
 
 (ns app.common.time
   #?(:cljs (:require
-            ["luxon" :as lxn]))
-  #?(:clj (:import
-           java.time.Instant)))
+            [luxon :as lxn]))
+  #?(:clj
+     (:import
+      java.time.Instant)))
 
 #?(:clj
    (defn now
