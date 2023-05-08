@@ -23,24 +23,6 @@
    [debug :refer [debug?]]
    [rumext.v2 :as mf]))
 
-(defn- draw-thumbnail-canvas!
-  [canvas-node img-node]
-  (try
-    (when (and (some? canvas-node) (some? img-node))
-      (let [canvas-context (.getContext canvas-node "2d")
-            canvas-width   (.-width canvas-node)
-            canvas-height  (.-height canvas-node)]
-        (.clearRect canvas-context 0 0 canvas-width canvas-height)
-        (.drawImage canvas-context img-node 0 0 canvas-width canvas-height)
-
-        ;; Set a true on the next animation frame, we make sure the drawImage is completed
-        (ts/raf
-         #(dom/set-data! canvas-node "ready" "true"))
-        true))
-    (catch :default err
-      (.error js/console err)
-      false)))
-
 (defn- remove-image-loading
   "Remove the changes related to change a url for its embed value. This is necessary
   so we don't have to recalculate the thumbnail when the image loads."
@@ -59,8 +41,7 @@
   "Hook that will create the thumbnail thata"
   [page-id {:keys [id] :as shape} node-ref rendered? disable? force-render]
 
-  (let [frame-canvas-ref (mf/use-ref nil)
-        frame-image-ref (mf/use-ref nil)
+  (let [frame-image-ref (mf/use-ref nil)
 
         disable-ref? (mf/use-var disable?)
 
@@ -93,7 +74,7 @@
 
         ;; We only need the zoom level in Safari. For other browsers we don't want to activate this because
         ;; will render for every zoom change
-        zoom (when (cf/check-browser? :safari) (mf/deref refs/selected-zoom))
+        ;; zoom (when (cf/check-browser? :safari) (mf/deref refs/selected-zoom))
 
         prev-thumbnail-data (hooks/use-previous thumbnail-data)
 
@@ -103,37 +84,25 @@
         ;; State variable to select whether we show the image thumbnail or the canvas thumbnail
         show-frame-thumbnail (mf/use-state (some? thumbnail-data))
 
-        ;; [value, setState] = useState(whatever)
-
-        disable-fills? (or @show-frame-thumbnail (some? @image-url))
+        ;; disable-fills? (or @show-frame-thumbnail (some? @image-url))
 
         on-image-load
         (mf/use-callback
          (mf/deps @show-frame-thumbnail)
          (fn []
-           (let [canvas-node (mf/ref-val frame-canvas-ref)
-                 img-node    (mf/ref-val frame-image-ref)]
-             ;; Cuando el `draw-thumbnail-canvas!` se lleve a cabo
-             ;; correctamente.
-             (when (draw-thumbnail-canvas! canvas-node img-node)
-               ;; Cuando no sea Safari, reseteamos el `image-url`
-               (when-not (cf/check-browser? :safari)
-                 (reset! image-url nil))
+           (let [image-node (mf/ref-val frame-image-ref)]
+             (dom/set-data! image-node "ready" "true")
 
-               ;; Cuando esté `show-frame-thumbnail` activo, 
-               ;; lo desactivamos.
-               (when @show-frame-thumbnail
-                 (reset! show-frame-thumbnail false))
-               ;; If we don't have the thumbnail data saved (normally the first load) we update the data
-               ;; when available
+             (when @show-frame-thumbnail
+               (reset! show-frame-thumbnail false))
+             ;; If we don't have the thumbnail data saved (normally the first load) we update the data
+             ;; when available
 
-               ;; Cuando no haya datos en el `:workspace-thumbnail`
-               ;; lo actualizamos.
-               (when (not @thumbnail-data-ref)
-                 (st/emit! (dwt/update-thumbnail page-id id)))
+             (when (not @thumbnail-data-ref)
+               (st/emit! (dwt/update-thumbnail page-id id)))
 
-               ;; Reseteamos el `render-frame?` a `false`.
-               (reset! render-frame? false)))))
+             (reset! render-frame? false))
+           ))
 
         generate-thumbnail
         (mf/use-callback
@@ -159,7 +128,7 @@
                                (dom/node->xml node))
 
                        blob (js/Blob. #js [svg-data] #js {:type "image/svg+xml;charset=utf-8"})
-                       url (.createObjectURL js/URL blob)]
+                       url (dm/str (.createObjectURL js/URL blob) "#svg")]
                    (reset! image-url url))
 
                  ;; Node not yet ready, we schedule a new generation
@@ -183,9 +152,9 @@
         on-update-frame
         (mf/use-callback
          (fn []
-           (let [canvas-node (mf/ref-val frame-canvas-ref)]
-             (when (not= "false" (dom/get-data canvas-node "ready"))
-               (dom/set-data! canvas-node "ready" "false")))
+           (let [image-node (mf/ref-val frame-image-ref)]
+             (when (not= "false" (dom/get-data image-node "ready"))
+               (dom/set-data! image-node "ready" "false")))
            (when (not @disable-ref?)
              (reset! render-frame? true)
              (reset! regenerate-thumbnail true))))
@@ -267,25 +236,25 @@
 
        ;; TODO: Me quiero cargar esto, tengo que ver como
        ;; si hacer que toda la app se vaya a la mierda.
-       [:foreignObject {:x x
-                        :y y
-                        :width width
-                        :height height
-                        :opacity (when disable-fills? 0)}
-        [:canvas.thumbnail-canvas
-         {:key (dm/str "thumbnail-canvas-" (:id shape))
-          :ref frame-canvas-ref
-          :data-object-id (dm/str page-id (:id shape))
-          :width width
-          :height height
-          :style {;; Safari has a problem with the positioning of the canvas. All this is to fix Safari behavior
-                  ;; https://bugs.webkit.org/show_bug.cgi?id=23113
-                  :display (when (cf/check-browser? :safari) "none")
-                  :position "fixed"
-                  :transform-origin "top left"
-                  :transform (when (cf/check-browser? :safari) (dm/fmt "scale(%)" zoom))
-                  ;; DEBUG
-                  :filter (when (debug? :thumbnails) "invert(1)")}}]]
+       ;; [:foreignObject {:x x
+       ;;                  :y y
+       ;;                  :width width
+       ;;                  :height height
+       ;;                  :opacity (when disable-fills? 0)}
+       ;;  [:canvas.thumbnail-canvas
+       ;;   {:key (dm/str "thumbnail-canvas-" (:id shape))
+       ;;    :ref frame-canvas-ref
+       ;;    :data-object-id (dm/str page-id (:id shape))
+       ;;    :width width
+       ;;    :height height
+       ;;    :style {;; Safari has a problem with the positioning of the canvas. All this is to fix Safari behavior
+       ;;            ;; https://bugs.webkit.org/show_bug.cgi?id=23113
+       ;;            :display (when (cf/check-browser? :safari) "none")
+       ;;            :position "fixed"
+       ;;            :transform-origin "top left"
+       ;;            :transform (when (cf/check-browser? :safari) (dm/fmt "scale(%)" zoom))
+       ;;            ;; DEBUG
+       ;;            :filter (when (debug? :thumbnails) "invert(1)")}}]]
 
        ;; Safari don't support filters so instead we add a rectangle around the thumbnail
        (when (and (cf/check-browser? :safari) (debug? :thumbnails))
@@ -297,8 +266,10 @@
                  :stroke-width 2}])
 
        (when (some? @image-url)
-         [:image {:x x
-                  :y y 
+         [:image.thumbnail-canvas {:x x
+                  :y y
+                  :key (dm/str "thumbnail-canvas-" (:id shape))
+                  :data-object-id (dm/str page-id (:id shape))
                   :width fixed-width
                   :height fixed-height
                   :ref frame-image-ref

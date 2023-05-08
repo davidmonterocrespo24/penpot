@@ -30,10 +30,10 @@
        (rx/filter #(= % id))
        (rx/take 1)))
 
-(defn thumbnail-canvas-blob-stream
+(defn thumbnail-blob-stream
   [object-id]
   ;; Look for the thumbnail canvas to send the data to the backend
-  (let [node (dom/query (dm/fmt "canvas.thumbnail-canvas[data-object-id='%'][data-ready='true']" object-id))
+  (let [node (dom/query (dm/fmt "image.thumbnail-canvas[data-object-id='%'][data-ready='true']" object-id))
         stopper (->> st/stream
                      (rx/filter (ptk/type? :app.main.data.workspace/finalize-page))
                      (rx/take 1))]
@@ -41,14 +41,15 @@
       (->> (rx/from (js/createImageBitmap node))
            (rx/switch-map
             #(uw/ask! {:cmd :object-thumbnails/generate} %))
-           (rx/map :result)
-           (rx/flat-map
-            #(http/send! {:uri % :response-type :blob :method :get}))
-           (rx/map :body))
+           (rx/map :result))
+          ;;  (rx/flat-map
+          ;;   #(http/send! {:uri % :response-type :blob :method :get}))
+          ;;  (rx/tap #(prn "Thumbnail blob" %))
+          ;;  (rx/map :body))
 
       ;; Not found, we retry after delay
       (->> (rx/timer 250)
-           (rx/flat-map #(thumbnail-canvas-blob-stream object-id))
+           (rx/flat-map #(thumbnail-blob-stream object-id))
            (rx/take-until stopper)))))
 
 (defn clear-thumbnail
@@ -70,7 +71,7 @@
      (watch [_ state _]
        (let [object-id   (dm/str page-id frame-id)
              file-id     (or file-id (:current-file-id state))
-             blob-result (thumbnail-canvas-blob-stream object-id)
+             blob-result (thumbnail-blob-stream object-id)
              params {:file-id file-id :object-id object-id :data nil}]
 
          (rx/concat
@@ -79,23 +80,35 @@
                (rx/catch #(rx/empty)))
 
           ;; Remove the thumbnail temporary. If the user changes pages the thumbnail is regenerated
-          (rx/of #(update % :workspace-thumbnails assoc object-id nil))
+          ;; TODO: Esto se llama dos veces y sin embargo
+          ;; al update no llega.
+          (rx/of (fn [state] 
+                   (prn "Removing thumbnail" object-id)
+                   (update state :workspace-thumbnails assoc object-id nil)))
 
           ;; Send the update to the back-end
           (->> blob-result
-               (rx/merge-map
-                (fn [blob]
-                  (if (some? blob)
-                    (wapi/read-file-as-data-url blob)
-                    (rx/of nil))))
+               ;; TODO: Esto ya no sería necesario
+               ;; porque podemos mandar los datos como
+               ;; multipart/form-data.
+              ;;  (rx/merge-map
+              ;;   (fn [blob]
+              ;;     (if (some? blob)
+              ;;       (do
+              ;;         (prn "Sending thumbnail" object-id)
+              ;;         (wapi/read-file-as-data-url blob))
+              ;;       (rx/of nil))))
 
                (rx/merge-map
                 (fn [data]
+                  (prn "Sending thumbnail" object-id)
                   (if (and (some? data) (some? file-id))
                     (let [params (assoc params :data data)]
                       (rx/merge
                        ;; Update the local copy of the thumbnails so we don't need to request it again
-                       (rx/of #(update % :workspace-thumbnails assoc object-id data))
+                       (rx/of (fn [state] (update state :workspace-thumbnails assoc object-id data)))
+                       ;; TODO: Antes de enviarlo a back, deberíamos leer
+                       ;; el blob y enviarlo como multipart/form-data.
                        (->> (rp/cmd! :upsert-file-object-thumbnail params)
                             (rx/catch #(rx/empty))
                             (rx/ignore))))
