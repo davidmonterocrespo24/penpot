@@ -354,11 +354,6 @@
   [data {:keys [id]}]
   (ctf/purge-component data id))
 
-(defmethod process-change :set-component-modified
-  [data {:keys [_id]}]
-  data)
-  ;; (ctkl/set-component-modified data id))
-
 ;; -- Typography
 
 (defmethod process-change :add-typography

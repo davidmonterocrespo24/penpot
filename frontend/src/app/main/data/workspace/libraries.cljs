@@ -612,8 +612,7 @@
                  (-> (pcb/empty-changes it)
                      (pcb/set-undo-group undo-group)
                      (pcb/with-container container)
-                     (cond-> (ctk/instance-head? shape)
-                       (dwlh/generate-sync-shape-inverse libraries container id)))
+                     (dwlh/generate-sync-shape-inverse libraries container id))
 
                  file-id   (:component-file shape)
                  file      (wsh/get-file state file-id)
@@ -632,15 +631,7 @@
 
                  nonlocal-changes (-> changes
                                       (update :redo-changes #(into [] xf-remove %))
-                                      (update :undo-changes #(into [] xf-remove %)))
-
-                 local-changes (cond-> local-changes
-                                 (= (:id local-file) file-id)
-                                 (pcb/set-component-modified (:component-id shape)))
-
-                 nonlocal-changes (cond-> nonlocal-changes
-                                    (not= (:id local-file) file-id)
-                                    (pcb/set-component-modified (:component-id shape)))]
+                                      (update :undo-changes #(into [] xf-remove %)))]
 
              (log/debug :msg "UPDATE-COMPONENT finished"
                         :js/local-changes (log-changes
@@ -823,7 +814,6 @@
                {:file-id (get-in state [:workspace-file :id])
                 :date (dt/now)}))))
 
-(defn spy [msg x] (js/console.log msg (clj->js x)) x)
 (defn assets-need-sync
   "Get a lazy sequence of all the assets of each type in the library that have
   been modified after the last sync of the library. The sync date may be
@@ -834,7 +824,7 @@
   ([library file-data ignore-until]
     (let [sync-date (max (:synced-at library) (or ignore-until 0))]
       (when (> (:modified-at library) sync-date)
-        (spy "result" (ctf/used-assets-changed-since file-data library sync-date))))))
+        (ctf/used-assets-changed-since file-data library sync-date)))))
 
 (defn notify-sync-file
   [file-id]

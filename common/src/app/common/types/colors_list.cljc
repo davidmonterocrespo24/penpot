@@ -7,8 +7,8 @@
 (ns app.common.types.colors-list
   (:require
    [app.common.data :as d]
-   [app.common.types.color :as ctc]
-   [app.util.time :as dt]))
+   [app.common.time :as dt]
+   [app.common.types.color :as ctc]))
 
 (defn colors-seq
   [file-data]

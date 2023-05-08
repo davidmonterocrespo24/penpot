@@ -8,7 +8,7 @@
   (:require
    [app.common.data :as d]
    [app.common.text :as txt]
-   [app.util.time :as dt]))
+   [app.common.time :as dt]))
 
 (defn typographies-seq
   [file-data]

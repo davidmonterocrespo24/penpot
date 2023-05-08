@@ -172,9 +172,6 @@
 (defmethod change-spec :purge-component [_]
   (s/keys :req-un [::id]))
 
-(defmethod change-spec :set-component-modified [_]
-  (s/keys :req-un [::id]))
-
 (defmethod change-spec :add-typography [_]
   (s/keys :req-un [::ctt/typography]))
 

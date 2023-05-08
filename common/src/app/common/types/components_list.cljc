@@ -9,8 +9,8 @@
    [app.common.data :as d]
    [app.common.data.macros :as dm]
    [app.common.files.features :as feat]
-   [app.common.types.component :as ctk]
-   [app.util.time :as dt]))
+   [app.common.time :as dt]
+   [app.common.types.component :as ctk]))
 
 (defn components
   [file-data]
@@ -92,7 +92,6 @@
 
 (defn set-component-modified
   [file-data component-id]
-  (prn "set-component-modified" component-id)
   (update-component file-data component-id identity))
 
 (defn delete-component
