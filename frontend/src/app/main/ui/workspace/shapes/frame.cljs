@@ -22,7 +22,7 @@
    [app.main.ui.shapes.text.fontfaces :as ff]
    [app.main.ui.workspace.shapes.frame.dynamic-modifiers :as fdm]
    [app.main.ui.workspace.shapes.frame.node-store :as fns]
-   [app.main.ui.workspace.shapes.frame.thumbnail-render-alt :as ftr]
+   [app.main.ui.workspace.shapes.frame.thumbnail-render :as ftr]
    [beicon.core :as rx]
    [rumext.v2 :as mf]))
 

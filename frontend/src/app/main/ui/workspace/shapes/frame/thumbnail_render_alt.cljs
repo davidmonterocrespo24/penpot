@@ -71,7 +71,9 @@
 
         on-image-load
         (mf/use-callback 
-         (fn [node] (prn "on-image-load" node)))]
+         (fn [node] (prn "on-image-load" node)))
+        
+        _ (js/console.log thumbnail-data)]
 
     [on-mount-frame
      @render-frame?

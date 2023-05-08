@@ -18,11 +18,9 @@
    [app.main.ui.shapes.frame :as frame]
    [app.util.dom :as dom]
    [app.util.timers :as ts]
-   [app.util.webapi :as wapi]
    [beicon.core :as rx]
    [cuerdas.core :as str]
    [debug :refer [debug?]]
-   [promesa.core :as p]
    [rumext.v2 :as mf]))
 
 (defn- draw-thumbnail-canvas!
@@ -115,17 +113,26 @@
          (fn []
            (let [canvas-node (mf/ref-val frame-canvas-ref)
                  img-node    (mf/ref-val frame-image-ref)]
+             ;; Cuando el `draw-thumbnail-canvas!` se lleve a cabo
+             ;; correctamente.
              (when (draw-thumbnail-canvas! canvas-node img-node)
+               ;; Cuando no sea Safari, reseteamos el `image-url`
                (when-not (cf/check-browser? :safari)
                  (reset! image-url nil))
 
+               ;; Cuando esté `show-frame-thumbnail` activo, 
+               ;; lo desactivamos.
                (when @show-frame-thumbnail
                  (reset! show-frame-thumbnail false))
                ;; If we don't have the thumbnail data saved (normally the first load) we update the data
                ;; when available
-               (when (not @thumbnail-data-ref)
-                 (st/emit! (dwt/update-thumbnail page-id id) ))
 
+               ;; Cuando no haya datos en el `:workspace-thumbnail`
+               ;; lo actualizamos.
+               (when (not @thumbnail-data-ref)
+                 (st/emit! (dwt/update-thumbnail page-id id)))
+
+               ;; Reseteamos el `render-frame?` a `false`.
                (reset! render-frame? false)))))
 
         generate-thumbnail
@@ -152,9 +159,8 @@
                                (dom/node->xml node))
 
                        blob (js/Blob. #js [svg-data] #js {:type "image/svg+xml;charset=utf-8"})
-
-                       img-src (.createObjectURL js/URL blob)]
-                   (reset! image-url img-src))
+                       url (.createObjectURL js/URL blob)]
+                   (reset! image-url url))
 
                  ;; Node not yet ready, we schedule a new generation
                  (ts/schedule generate-thumbnail)))
@@ -171,7 +177,9 @@
                (when (and (not loading-images?) (not loading-fonts?))
                  (generate-thumbnail)
                  (reset! regenerate-thumbnail false))))))
-
+        
+        ;; Cuando se actualiza el frame, se marca como no listo para que no se 
+        ;; envíe al fondo hasta que se regenere.
         on-update-frame
         (mf/use-callback
          (fn []
@@ -241,16 +249,6 @@
             (.disconnect @observer-ref)
             (reset! observer-ref nil)))))
 
-    ;; When the thumbnail-data is empty we regenerate the thumbnail
-    (mf/use-effect
-     (mf/deps (:selrect shape) thumbnail-data)
-     (fn []
-       (let [{:keys [width height]} (:selrect shape)]
-         (p/then (wapi/empty-png-size width height)
-                 (fn [data]
-                   (when (<= (count thumbnail-data) (+ 100 (count data)))
-                     (rx/push! updates-str :update)))))))
-
     [on-load-frame-dom
      @render-frame?
      (mf/html
@@ -267,6 +265,8 @@
                     (some? thumbnail-data)
                     (assoc :thumbnail thumbnail-data))}])
 
+       ;; TODO: Me quiero cargar esto, tengo que ver como
+       ;; si hacer que toda la app se vaya a la mierda.
        [:foreignObject {:x x
                         :y y
                         :width width
@@ -297,12 +297,11 @@
                  :stroke-width 2}])
 
        (when (some? @image-url)
-         [:foreignObject {:x x
-                          :y y
-                          :width fixed-width
-                          :height fixed-height}
-          [:img {:ref frame-image-ref
-                 :src @image-url
-                 :width fixed-width
-                 :height fixed-height
-                 :on-load on-image-load}]])])]))
+         [:image {:x x
+                  :y y 
+                  :width fixed-width
+                  :height fixed-height
+                  :ref frame-image-ref
+                  :href @image-url
+                  :on-load on-image-load}])])]))
+         
